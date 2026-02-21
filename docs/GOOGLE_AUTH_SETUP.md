@@ -44,6 +44,30 @@ Your app already has the Google sign-in button wired up. Follow these steps to e
 
 ## Troubleshooting
 
+### "Site cannot be reached" after clicking Google
+
+This usually means the **Supabase project is paused** or the callback URL is wrong.
+
+**1. Check if Supabase project is paused**
+- Go to [Supabase Dashboard](https://supabase.com/dashboard)
+- If you see "Project is paused", click **Restore project** (free tier projects pause after ~7 days of inactivity)
+- Wait a few minutes for it to come back online
+
+**2. Verify Google redirect URI**
+- In Google Cloud Console → Credentials → your OAuth client
+- **Authorized redirect URIs** must be **exactly**:
+  ```
+  https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
+  ```
+- Get `YOUR_PROJECT_REF` from Supabase → Project Settings → General → Reference ID
+- No trailing slash, no typos
+
+**3. Test Supabase is reachable**
+- Open `https://YOUR_PROJECT_REF.supabase.co` in your browser
+- If it doesn't load, the project is likely paused
+
+### Other errors
+
 | Error | Fix |
 |-------|-----|
 | "redirect_uri_mismatch" | Ensure the Supabase callback URL is exactly correct in Google's Authorized redirect URIs |
