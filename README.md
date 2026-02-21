@@ -48,6 +48,15 @@ A mobile-first SPA for sustainable food tracking, calorie management, and reduci
 - **Food Calories**: [CalorieNinjas](https://calorieninjas.com/), [Foodvisor](https://www.foodvisor.io/), or [Edamam Vision](https://developer.edamam.com/)
 - **Meme generator**: Custom or third-party image transformation API
 
-## Deploy
+## Deploy to Render
 
-Optimized for Cloudflare Pages. Run `npm run build` and deploy the `dist` folder.
+1. Push your code to GitHub and connect the repo at [render.com](https://render.com)
+2. **Option A – Blueprint**: Render will detect `render.yaml` and create the static site automatically
+3. **Option B – Manual**: Create a **Static Site**, set:
+   - **Build Command**: `npm install && npm run build`
+   - **Publish Directory**: `dist`
+   - Add a **Rewrite** rule: `/*` → `/index.html` (for React Router)
+4. Add environment variables in the Render dashboard:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+5. In Supabase Auth → URL Configuration, add your Render URL (e.g. `https://zerocrust.onrender.com`) to **Redirect URLs**
