@@ -11,8 +11,9 @@ function ProtectedRoute() {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-zinc-950">
-        <div className="animate-pulse text-zinc-500">Loading...</div>
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-zinc-950 p-6">
+        <img src="/ZeroCrumbWhite.png" alt="ZeroCrust" className="h-10 w-auto opacity-80" />
+        <p className="text-zinc-400 animate-pulse">Loading...</p>
       </div>
     )
   }

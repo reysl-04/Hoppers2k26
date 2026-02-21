@@ -45,38 +45,48 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </button>
       </header>
 
-      {menuOpen && (
-        <nav className="absolute top-full left-0 right-0 z-40 bg-zinc-900 border-b border-zinc-800 shadow-xl">
-          <div className="px-4 py-4 flex flex-col gap-1">
-            {navLinks.map(({ to, label }) => (
-              <Link
-                key={to}
-                to={to}
-                onClick={() => setMenuOpen(false)}
-                className={`px-4 py-3 rounded-lg font-medium transition-colors touch-manipulation ${
-                  location.pathname === to
-                    ? 'bg-emerald-600/30 text-emerald-400'
-                    : 'hover:bg-zinc-800 text-zinc-300'
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-            {user && (
-              <button
-                type="button"
-                onClick={() => {
-                  signOut()
-                  setMenuOpen(false)
-                }}
-                className="px-4 py-3 rounded-lg font-medium text-left text-red-400 hover:bg-zinc-800 transition-colors touch-manipulation"
-              >
-                Sign Out
-              </button>
-            )}
-          </div>
-        </nav>
-      )}
+      <nav className={`fixed z-40 bg-zinc-900 shadow-xl transform transition-all duration-300 ease-out ${
+        menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      } ${
+        // Mobile: expand from top (full width)
+        'top-[57px] left-0 right-0 h-auto border-b border-zinc-800'
+      } ${
+        // Desktop: slide from right (right side only)
+        'md:top-[57px] md:left-auto md:right-0 md:h-[calc(100vh-57px)] md:w-64 md:border-l md:border-r-0'
+      } ${
+        menuOpen
+          ? 'translate-y-0 md:translate-x-0'
+          : '-translate-y-full md:translate-x-full'
+      }`}>
+        <div className="px-4 py-6 flex flex-col gap-1 max-h-[60vh] overflow-y-auto md:max-h-none md:py-8">
+          {navLinks.map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              onClick={() => setMenuOpen(false)}
+              className={`px-4 py-3 rounded-lg font-medium transition-colors touch-manipulation ${
+                location.pathname === to
+                  ? 'bg-emerald-600/30 text-emerald-400'
+                  : 'hover:bg-zinc-800 text-zinc-300'
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+          {user && (
+            <button
+              type="button"
+              onClick={() => {
+                signOut()
+                setMenuOpen(false)
+              }}
+              className="px-4 py-3 rounded-lg font-medium text-left text-red-400 hover:bg-zinc-800 transition-colors touch-manipulation"
+            >
+              Sign Out
+            </button>
+          )}
+        </div>
+      </nav>
 
       <main className="flex-1 overflow-auto pb-safe">
         {children}

@@ -19,30 +19,32 @@ export function Home() {
       <div className="space-y-4">
         <Link
           to="/profile"
-          className="block p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 transition-colors"
+          className="block p-6 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/50 transition-colors flex flex-col items-center justify-center text-center"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-600/30 flex items-center justify-center">
-              <span className="text-emerald-400 font-bold text-lg">
+          <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-emerald-600/30 flex items-center justify-center overflow-hidden mb-6">
+            {user?.user_metadata?.avatar_url ? (
+              <img 
+                src={user.user_metadata.avatar_url} 
+                alt="Profile" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-emerald-400 font-bold text-2xl sm:text-3xl md:text-4xl">
                 {user?.email?.[0]?.toUpperCase() ?? '?'}
               </span>
-            </div>
-            <div className="flex-1">
-              <h2 className="font-semibold text-zinc-100">Profile</h2>
-              <p className="text-sm text-zinc-500">
-                {user?.email ?? 'View your stats & settings'}
-              </p>
-            </div>
-            <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            )}
           </div>
+          <h2 className="font-semibold text-zinc-100 text-lg sm:text-xl md:text-2xl mb-2">
+            {user?.user_metadata?.full_name || 'Profile'}
+          </h2>
+          <p className="text-sm sm:text-base text-zinc-500 leading-relaxed max-w-xs">
+            {user?.user_metadata?.description || user?.email || 'View your stats & settings'}
+          </p>
         </Link>
 
         <Link
           to="/upload"
-          className="block p-4 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 hover:border-emerald-500/60 transition-colors"
-        >
+          className="block p-4 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 hover:border-emerald-500/60 transition-colors">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-emerald-500/30 flex items-center justify-center">
               <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

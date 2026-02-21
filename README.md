@@ -26,19 +26,20 @@ A mobile-first SPA for sustainable food tracking, calorie management, and reduci
 
 2. **Configure Supabase**
    - Create a project at [supabase.com](https://supabase.com)
-   - Enable Google and Apple auth in Authentication → Providers
    - Copy `.env.example` to `.env` and add:
      ```
      VITE_SUPABASE_URL=your_project_url
      VITE_SUPABASE_ANON_KEY=your_anon_key
      ```
 
-3. **Run dev server**
+3. **Enable Google Auth** – See [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md) for step-by-step setup in Google Cloud Console and Supabase.
+
+4. **Run dev server**
    ```bash
    npm run dev
    ```
 
-4. **Build for production**
+5. **Build for production**
    ```bash
    npm run build
    ```

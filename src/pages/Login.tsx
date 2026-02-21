@@ -20,7 +20,18 @@ export function Login() {
       : await signInWithEmail(email, password)
     setLoading(false)
     if (err) {
-      setError(err.message)
+      // Provide more user-friendly error messages
+      let friendlyMessage = err.message
+      if (err.message.includes('rate limit')) {
+        friendlyMessage = 'Too many sign-up attempts. Please wait a few minutes before trying again, or try signing in instead.'
+      } else if (err.message.includes('email rate limit exceeded')) {
+        friendlyMessage = 'Email sending limit reached. Please wait a few minutes before trying again.'
+      } else if (err.message.includes('Email not confirmed')) {
+        friendlyMessage = 'Please check your email and click the confirmation link before signing in.'
+      } else if (err.message.includes('Invalid login credentials')) {
+        friendlyMessage = 'Invalid email or password. Please check your credentials and try again.'
+      }
+      setError(friendlyMessage)
       return
     }
     navigate('/')
