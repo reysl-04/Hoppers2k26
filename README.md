@@ -44,10 +44,10 @@ A mobile-first SPA for sustainable food tracking, calorie management, and reduci
    npm run build
    ```
 
-## APIs to Integrate
+## APIs
 
-- **Food Calories**: [CalorieNinjas](https://calorieninjas.com/), [Foodvisor](https://www.foodvisor.io/), or [Edamam Vision](https://developer.edamam.com/)
-- **Meme generator**: Custom or third-party image transformation API
+- **LogMeal** (integrated): Food recognition & nutrition. Add `VITE_LOGMEAL_API_KEY` to `.env`. Get your APIUser token at [logmeal.com](https://logmeal.com). See [docs](https://docs.logmeal.com/docs/guides-getting-started-quickstart).
+- **Meme generator**: Placeholder – add custom or third-party image API
 
 ## Deploy to Render
 
