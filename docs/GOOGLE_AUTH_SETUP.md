@@ -30,12 +30,16 @@ Your app already has the Google sign-in button wired up. Follow these steps to e
 4. Paste the **Client ID** and **Client Secret** from Google
 5. Save
 
-## 3. Supabase Redirect URLs
+## 3. Supabase URL Configuration (required – fixes "requested path is invalid")
 
 1. In Supabase: **Authentication** → **URL Configuration**
-2. Under **Redirect URLs**, add:
-   - `http://localhost:5173/` (local dev)
-   - `https://your-app.onrender.com/` (your Render URL)
+2. Set **Site URL** to your main app URL:
+   - Local: `http://localhost:5173`
+   - Production: `https://your-app.onrender.com`
+3. Under **Redirect URLs**, click **Add URL** and add each of these exactly (no trailing slash for root):
+   - `http://localhost:5173/`
+   - `https://your-app.onrender.com/` (replace with your actual Render URL)
+4. Click **Save**
 
 ## 4. Test
 
@@ -43,6 +47,19 @@ Your app already has the Google sign-in button wired up. Follow these steps to e
 - **Production**: Deploy and test on your Render URL
 
 ## Troubleshooting
+
+### "Requested path is invalid" after clicking Google
+
+**Fix:** Add your app URLs to Supabase's Redirect URLs allow list.
+
+1. Supabase Dashboard → **Authentication** → **URL Configuration**
+2. Set **Site URL** to your app (e.g. `https://YOUR-RENDER-URL.onrender.com` or `http://localhost:5173`)
+3. Under **Redirect URLs**, add the exact URLs (include trailing slash for root):
+   - `http://localhost:5173/` (for local dev)
+   - `https://YOUR-RENDER-URL.onrender.com/` (for production)
+4. **Save**
+
+The `redirectTo` URL in the app must exactly match one of these.
 
 ### "Site cannot be reached" after clicking Google
 
