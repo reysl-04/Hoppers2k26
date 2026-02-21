@@ -9,6 +9,7 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>
   signInWithGoogle: () => Promise<{ error: Error | null }>
   signInWithApple: () => Promise<{ error: Error | null }>
+  updateUser: (updates: { full_name?: string; description?: string; avatar_url?: string }) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
 }
 
@@ -51,6 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null }
   }
 
+  const updateUser = async (updates: { full_name?: string; description?: string }) => {
+    const { error } = await supabase.auth.updateUser({
+      data: updates
+    })
+    if (!error) {
+      // Refresh the user data
+      const { data: { user: updatedUser } } = await supabase.auth.getUser()
+      setUser(updatedUser)
+    }
+    return { error: error as Error | null }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
@@ -64,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUpWithEmail,
         signInWithGoogle,
         signInWithApple,
+        updateUser,
         signOut,
       }}
     >
