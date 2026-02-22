@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   analyzeFoodImage,
   type LogMealNutritionResponse,
@@ -64,6 +64,7 @@ function getFoodItemsFromResponse(data: LogMealNutritionResponse): Array<{
 }
 
 export function Upload() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState<AnalyzerMode>(null)
   const [file, setFile] = useState<File | null>(null)
   const [fileBefore, setFileBefore] = useState<File | null>(null)
@@ -186,6 +187,14 @@ export function Upload() {
 
   const handleMeme = () => {
     setShowMeme(true)
+  }
+
+  const handlePostOnline = () => {
+    if (!preview) {
+      setError('Please upload an image first')
+      return
+    }
+    navigate('/share-post', { state: { imagePreview: preview } })
   }
 
   const foodItems = result ? getFoodItemsFromResponse(result.data) : []
@@ -378,6 +387,14 @@ export function Upload() {
                 className="w-full py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 font-medium hover:bg-amber-500/30 touch-manipulation"
               >
                 Turn into meme
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePostOnline}
+                className="w-full py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 font-medium hover:bg-emerald-600/30 touch-manipulation"
+              >
+                Post online
               </button>
 
               {showMeme && (
