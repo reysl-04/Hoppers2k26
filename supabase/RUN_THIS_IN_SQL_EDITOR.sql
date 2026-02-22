@@ -13,11 +13,18 @@ create table if not exists food_analyses (
   calories_consumed float,
   food_waste_calories float,
   nutritional_data jsonb,
-  exp_earned int default 10
+  exp_earned int default 10,
+  title text
 );
+
+alter table food_analyses add column if not exists title text;
 
 -- RLS
 alter table food_analyses enable row level security;
+
+drop policy if exists "Users can update own analyses" on food_analyses;
+create policy "Users can update own analyses" on food_analyses
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can insert own analyses" on food_analyses;
 create policy "Users can insert own analyses" on food_analyses

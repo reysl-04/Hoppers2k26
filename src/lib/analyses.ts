@@ -15,6 +15,7 @@ export interface FoodAnalysis {
   food_waste_calories: number | null
   nutritional_data: Record<string, unknown> | null
   exp_earned: number
+  title: string | null
 }
 
 export interface DetectedItem {
@@ -33,6 +34,7 @@ export interface SaveCalorieAnalysisParams {
   calories: number
   nutritionalData?: NutritionalData
   expEarned?: number
+  title?: string
 }
 
 export interface SaveBeforeAfterAnalysisParams {
@@ -45,6 +47,7 @@ export interface SaveBeforeAfterAnalysisParams {
   foodWasteCalories: number
   nutritionalData?: NutritionalData
   expEarned?: number
+  title?: string
 }
 
 async function uploadImage(userId: string, file: File, suffix: string): Promise<string> {
@@ -78,6 +81,7 @@ export async function saveCalorieAnalysis(params: SaveCalorieAnalysisParams): Pr
       calories: params.calories,
       nutritional_data: params.nutritionalData ?? null,
       exp_earned: params.expEarned ?? 10,
+      title: params.title ?? null,
     })
     .select()
     .single()
@@ -107,6 +111,7 @@ export async function saveBeforeAfterAnalysis(
       food_waste_calories: params.foodWasteCalories,
       nutritional_data: params.nutritionalData ?? null,
       exp_earned: params.expEarned ?? 20,
+      title: params.title ?? null,
     })
     .select()
     .single()
@@ -155,4 +160,46 @@ export async function getAnalysesByMonth(
     dates[d] = (dates[d] ?? 0) + 1
   }
   return dates
+}
+
+export interface UpdateAnalysisParams {
+  title?: string
+  calories?: number
+  calories_after?: number
+  calories_consumed?: number
+  food_waste_calories?: number
+  nutritional_data?: NutritionalData | null
+}
+
+export async function updateAnalysis(
+  analysisId: string,
+  userId: string,
+  updates: UpdateAnalysisParams
+): Promise<FoodAnalysis> {
+  const filtered = Object.fromEntries(
+    Object.entries(updates).filter(([, v]) => v !== undefined)
+  ) as Record<string, unknown>
+  if (Object.keys(filtered).length === 0) {
+    const { data } = await supabase.from('food_analyses').select('*').eq('id', analysisId).single()
+    if (data) return data as FoodAnalysis
+    throw new Error('Analysis not found')
+  }
+  const { data, error } = await supabase
+    .from('food_analyses')
+    .update(filtered)
+    .eq('id', analysisId)
+    .eq('user_id', userId)
+    .select()
+    .single()
+  if (error) throw new Error(`Failed to update: ${error.message}`)
+  return data as FoodAnalysis
+}
+
+export async function deleteAnalysis(analysisId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('food_analyses')
+    .delete()
+    .eq('id', analysisId)
+    .eq('user_id', userId)
+  if (error) throw new Error(`Failed to delete: ${error.message}`)
 }

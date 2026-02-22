@@ -185,6 +185,7 @@ export function Upload() {
             calories,
             nutritionalData,
             expEarned: XP_PER_ANALYSIS,
+            title: geminiResult?.caption?.trim() || undefined,
           })
           const stats = await updateStatsOnMealLog(user.id, {
             type: 'calorie',
@@ -250,6 +251,9 @@ export function Upload() {
           const nutritionalData = before.nutritional_info
             ? { totalNutrients: before.nutritional_info.totalNutrients, detectedItems: foodItems }
             : undefined
+          const beforeTitle = geminiBefore?.caption?.trim()
+          const afterTitle = geminiAfter?.caption?.trim()
+          const combinedTitle = [beforeTitle, afterTitle].filter(Boolean).join(' → ') || undefined
           await saveBeforeAfterAnalysis({
             userId: user.id,
             imageFileBefore: fileBefore,
@@ -260,6 +264,7 @@ export function Upload() {
             foodWasteCalories: caloriesAfter,
             nutritionalData,
             expEarned: XP_PER_ANALYSIS * 2,
+            title: combinedTitle,
           })
           const stats = await updateStatsOnMealLog(user.id, {
             type: 'before_after',

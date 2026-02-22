@@ -3,8 +3,11 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   getAnalysesByDate,
   getAnalysesByMonth,
+  updateAnalysis,
+  deleteAnalysis,
   type FoodAnalysis,
   type NutritionalData,
+  type DetectedItem,
 } from '../lib/analyses'
 import { getFoodImageCaption } from '../lib/gemini'
 import { getUserStats } from '../lib/stats'
@@ -28,25 +31,260 @@ const MACRO_LABELS: Record<string, string> = {
   SUGAR: 'Sugar',
 }
 
-function AnalysisDetail({ analysis }: { analysis: FoodAnalysis }) {
+function AnalysisDetail({
+  analysis,
+  userId,
+  onUpdate,
+  onDelete,
+}: {
+  analysis: FoodAnalysis
+  userId: string
+  onUpdate: (updated: FoodAnalysis) => void
+  onDelete: (id: string) => void
+}) {
   const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [caption, setCaption] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const nutritionalData = analysis.nutritional_data as NutritionalData | null
-  const macros = nutritionalData?.totalNutrients
-  const detectedItems = nutritionalData?.detectedItems ?? []
+  const macros = nutritionalData?.totalNutrients ?? {}
+  const detectedItems: DetectedItem[] = nutritionalData?.detectedItems ?? []
+
+  const displayTitle =
+    analysis.title?.trim() ||
+    caption ||
+    (analysis.type === 'before_after' ? 'Before/After' : 'Calorie analysis')
 
   useEffect(() => {
-    if (!import.meta.env.VITE_GEMINI_API_KEY) return
+    if (analysis.title?.trim() || !import.meta.env.VITE_GEMINI_API_KEY) return
     getFoodImageCaption(analysis.image_url)
       .then(setCaption)
       .catch(() => setCaption(null))
-  }, [analysis.image_url])
+  }, [analysis.image_url, analysis.title])
 
   const hasDetails = (macros && Object.keys(macros).length > 0) || detectedItems.length > 0
 
+  const [editTitle, setEditTitle] = useState(analysis.title ?? '')
+  const [editCalories, setEditCalories] = useState(analysis.calories)
+  const [editCaloriesAfter, setEditCaloriesAfter] = useState(analysis.calories_after ?? 0)
+  const [editCaloriesConsumed, setEditCaloriesConsumed] = useState(analysis.calories_consumed ?? 0)
+  const [editFoodWaste, setEditFoodWaste] = useState(analysis.food_waste_calories ?? 0)
+  const [editItems, setEditItems] = useState<DetectedItem[]>(detectedItems)
+  const [editMacros, setEditMacros] = useState<Record<string, { label?: string; quantity?: number; unit?: string }>>(
+    { ...macros }
+  )
+
+  const resetEditForm = () => {
+    setEditTitle(analysis.title ?? '')
+    setEditCalories(analysis.calories)
+    setEditCaloriesAfter(analysis.calories_after ?? 0)
+    setEditCaloriesConsumed(analysis.calories_consumed ?? 0)
+    setEditFoodWaste(analysis.food_waste_calories ?? 0)
+    setEditItems([...detectedItems])
+    setEditMacros({ ...macros })
+  }
+
+  const handleStartEdit = () => {
+    resetEditForm()
+    setEditing(true)
+    setError(null)
+  }
+
+  const handleSaveEdit = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const newNutrients: Record<string, { label?: string; quantity?: number; unit?: string }> = {}
+      for (const k of MACRO_KEYS) {
+        if (editMacros[k]) {
+          newNutrients[k] = {
+            ...editMacros[k],
+            quantity: editMacros[k].quantity ?? 0,
+            unit: editMacros[k].unit ?? 'g',
+          }
+        }
+      }
+      const nutritionalData: NutritionalData = {
+        totalNutrients: Object.keys(newNutrients).length > 0 ? newNutrients : undefined,
+        detectedItems: editItems.length > 0 ? editItems : undefined,
+      }
+      const updated = await updateAnalysis(analysis.id, userId, {
+        title: editTitle.trim() || undefined,
+        calories: editCalories,
+        calories_after: analysis.type === 'before_after' ? editCaloriesAfter : undefined,
+        calories_consumed: analysis.type === 'before_after' ? editCaloriesConsumed : undefined,
+        food_waste_calories: analysis.type === 'before_after' ? editFoodWaste : undefined,
+        nutritional_data:
+          nutritionalData.totalNutrients || nutritionalData.detectedItems ? nutritionalData : undefined,
+      })
+      onUpdate(updated)
+      setEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this entry? This cannot be undone.')) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteAnalysis(analysis.id, userId)
+      onDelete(analysis.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const updateItem = (i: number, field: 'name' | 'calories', value: string | number) => {
+    setEditItems((prev) => {
+      const next = [...prev]
+      next[i] = { ...next[i], [field]: value }
+      return next
+    })
+  }
+
+  const updateMacro = (key: string, quantity: number) => {
+    setEditMacros((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], quantity, unit: prev[key]?.unit ?? 'g', label: prev[key]?.label ?? MACRO_LABELS[key] },
+    }))
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 p-4 space-y-4">
+        <h3 className="font-semibold text-zinc-100">Edit entry</h3>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Title</label>
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+            placeholder="e.g. Grilled chicken salad"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Calories</label>
+          <input
+            type="number"
+            value={editCalories}
+            onChange={(e) => setEditCalories(Number(e.target.value) || 0)}
+            className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+          />
+        </div>
+        {analysis.type === 'before_after' && (
+          <>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">After (remaining) cal</label>
+              <input
+                type="number"
+                value={editCaloriesAfter}
+                onChange={(e) => setEditCaloriesAfter(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Consumed cal</label>
+              <input
+                type="number"
+                value={editCaloriesConsumed}
+                onChange={(e) => setEditCaloriesConsumed(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Food waste cal</label>
+              <input
+                type="number"
+                value={editFoodWaste}
+                onChange={(e) => setEditFoodWaste(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+              />
+            </div>
+          </>
+        )}
+        {editItems.length > 0 && (
+          <div>
+            <h4 className="text-xs font-medium text-zinc-500 uppercase mb-2">Detected items</h4>
+            <div className="space-y-2">
+              {editItems.map((item, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(e) => updateItem(i, 'name', e.target.value)}
+                    className="flex-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={item.calories}
+                    onChange={(e) => updateItem(i, 'calories', Number(e.target.value) || 0)}
+                    className="w-20 px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+                  />
+                  <span className="text-zinc-500 text-xs">cal</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {(MACRO_KEYS.filter((k) => editMacros[k] || macros[k]).length > 0) && (
+          <div>
+            <h4 className="text-xs font-medium text-zinc-500 uppercase mb-2">Macronutrients</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {MACRO_KEYS.map((key) => {
+                const label = MACRO_LABELS[key]
+                const val = editMacros[key] ?? macros[key]
+                const qty = val?.quantity ?? 0
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-zinc-500 text-sm w-20">{label}</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={qty}
+                      onChange={(e) => updateMacro(key, Number(e.target.value) || 0)}
+                      className="flex-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm"
+                    />
+                    <span className="text-zinc-500 text-xs">{val?.unit ?? 'g'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSaveEdit}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="px-4 py-2 rounded-lg bg-zinc-700 text-zinc-300 text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700">
-      {/* Header: Food image as title */}
       <div className="relative">
         <img
           src={analysis.image_url}
@@ -54,15 +292,39 @@ function AnalysisDetail({ analysis }: { analysis: FoodAnalysis }) {
           className="w-full aspect-video object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <p className="font-semibold text-white text-lg">
-            {caption || (analysis.type === 'before_after' ? 'Before/After' : 'Calorie analysis')}
-          </p>
-          <p className="text-emerald-400 font-bold">{Math.round(analysis.calories)} cal</p>
+        <div className="absolute bottom-0 left-0 right-0 p-3 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-white text-lg">{displayTitle}</p>
+            <p className="text-emerald-400 font-bold">{Math.round(analysis.calories)} cal</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="p-2 rounded-lg bg-zinc-700/80 hover:bg-zinc-600 text-zinc-200"
+              title="Edit"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="p-2 rounded-lg bg-red-500/30 hover:bg-red-500/50 text-red-300 disabled:opacity-50"
+              title="Delete"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="p-3">
+        {error && <p className="text-sm text-red-400 mb-2">{error}</p>}
         {analysis.type === 'before_after' && (
           <div className="flex gap-2 text-sm mb-2">
             <span className="text-emerald-400">
@@ -410,7 +672,28 @@ export function History() {
               ) : (
                 <div className="space-y-4">
                   {selectedAnalyses.map((a) => (
-                    <AnalysisDetail key={a.id} analysis={a} />
+                    <AnalysisDetail
+                      key={a.id}
+                      analysis={a}
+                      userId={user!.id}
+                      onUpdate={(updated) =>
+                        setSelectedAnalyses((prev) =>
+                          prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+                        )
+                      }
+                      onDelete={(id) => {
+                        setSelectedAnalyses((prev) => prev.filter((p) => p.id !== id))
+                        if (selectedDate) {
+                          setAnalysesByDate((prev) => {
+                            const count = (prev[selectedDate] ?? 1) - 1
+                            const next = { ...prev }
+                            if (count <= 0) delete next[selectedDate]
+                            else next[selectedDate] = count
+                            return next
+                          })
+                        }
+                      }}
+                    />
                   ))}
                 </div>
               )}
