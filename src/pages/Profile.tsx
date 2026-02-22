@@ -9,9 +9,12 @@ import type { UserStats } from '../lib/stats'
 interface Post {
   id: string
   image_url: string
+  image_url_after?: string
   description: string
   created_at: string
 }
+
+type ProfileTab = 'posts' | 'saved'
 
 export function Profile() {
   const { user, updateUser } = useAuth()
@@ -23,7 +26,9 @@ export function Profile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.user_metadata?.avatar_url ?? null)
   const [stats, setStats] = useState<UserStats | null>(null)
   const [userPosts, setUserPosts] = useState<Post[]>([])
+  const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [loadingPosts, setLoadingPosts] = useState(true)
+  const [profileTab, setProfileTab] = useState<ProfileTab>('posts')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [postToDelete, setPostToDelete] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -41,22 +46,25 @@ export function Profile() {
       }).catch(() => {})
     }
     
-    // Fetch user's posts
-    const loadUserPosts = async () => {
+    const loadPosts = async () => {
       setLoadingPosts(true)
-      const { data, error } = await supabase
-        .from('posts')
-        .select('id, image_url, description, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-      
-      if (!error && data) {
-        setUserPosts(data as Post[])
+      const [postsRes, savesRes] = await Promise.all([
+        supabase.from('posts').select('id, image_url, image_url_after, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('post_saves').select('post_id').eq('user_id', user.id),
+      ])
+      if (!postsRes.error && postsRes.data) {
+        setUserPosts(postsRes.data as Post[])
+      }
+      if (!savesRes.error && savesRes.data?.length) {
+        const ids = savesRes.data.map((r) => r.post_id)
+        const { data: saved } = await supabase.from('posts').select('id, image_url, image_url_after, description, created_at').in('id', ids).order('created_at', { ascending: false })
+        setSavedPosts((saved ?? []) as Post[])
+      } else {
+        setSavedPosts([])
       }
       setLoadingPosts(false)
     }
-    
-    loadUserPosts()
+    loadPosts()
   }, [user?.id])
 
   const { level, xpInLevel, xpNeededForNext } = stats
@@ -271,43 +279,61 @@ export function Profile() {
         </div>
       </Link>
 
-      {/* User's Posts Section */}
+      {/* Posts Section */}
       <div className="mt-8">
-        <h2 className="font-semibold text-zinc-300 mb-4">Your Posts</h2>
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setProfileTab('posts')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${profileTab === 'posts' ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            My Posts
+          </button>
+          <button
+            type="button"
+            onClick={() => setProfileTab('saved')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${profileTab === 'saved' ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Saved
+          </button>
+        </div>
         {loadingPosts ? (
-          <div className="p-4 text-center text-zinc-400 text-sm">Loading posts...</div>
-        ) : userPosts.length === 0 ? (
+          <div className="p-4 text-center text-zinc-400 text-sm">Loading...</div>
+        ) : profileTab === 'posts' && userPosts.length === 0 ? (
           <div className="p-4 text-center text-zinc-400 text-sm">No posts yet. Start sharing!</div>
+        ) : profileTab === 'saved' && savedPosts.length === 0 ? (
+          <div className="p-4 text-center text-zinc-400 text-sm">No saved posts. Tap the bookmark on any post to save it.</div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
-            {userPosts.map((post) => (
-              <div key={post.id} className="relative group aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-                <img
-                  src={post.image_url}
-                  alt="Post"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center">
-                  <button
-                    onClick={() => handleDeleteClick(post.id)}
-                    disabled={deletingId === post.id}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300 disabled:opacity-50"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
+            {(profileTab === 'posts' ? userPosts : savedPosts).map((post) => (
+              <Link key={post.id} to="/" className="relative group aspect-square rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800 block">
+                {post.image_url_after ? (
+                  <div className="grid grid-cols-2 w-full h-full">
+                    <img src={post.image_url} alt="Before" className="w-full h-full object-cover" />
+                    <img src={post.image_url_after} alt="After" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <img src={post.image_url} alt="Post" className="w-full h-full object-cover" />
+                )}
+                {profileTab === 'posts' && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteClick(post.id) }}
+                      disabled={deletingId === post.id}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300 disabled:opacity-50"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <p className="text-xs text-zinc-300 line-clamp-2">{post.description}</p>
                   <p className="text-xs text-zinc-500 mt-1">{formatDate(post.created_at)}</p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

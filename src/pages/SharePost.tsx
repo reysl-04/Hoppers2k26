@@ -1,15 +1,11 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || '',
-  import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-)
+import { supabase } from '../lib/supabase'
 
 interface SharePostState {
   imagePreview: string
+  imagePreviewAfter?: string
 }
 
 export function SharePost() {
@@ -22,7 +18,7 @@ export function SharePost() {
   const [isPosting, setIsPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (!state?.imagePreview) {
+  if (!state?.imagePreview && !state?.imagePreviewAfter) {
     return (
       <div className="px-4 py-6 max-w-lg mx-auto text-center">
         <h1 className="text-2xl font-bold text-zinc-100 mb-4">Error</h1>
@@ -52,25 +48,32 @@ export function SharePost() {
     setError(null)
 
     try {
-      // Convert base64 image to blob
-      const response = await fetch(state.imagePreview)
+      const mainPreview = state.imagePreview || state.imagePreviewAfter!
+      const response = await fetch(mainPreview)
       const blob = await response.blob()
       const fileName = `${user.id}-${Date.now()}.jpg`
 
-      // Upload image to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('posts')
-        .upload(fileName, blob)
-
+      const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, blob)
       if (uploadError) throw uploadError
 
-      // Get public URL for the image
       const { data: publicUrlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+      let imageUrlAfter: string | undefined
 
-      // Insert post into database
+      if (state.imagePreviewAfter && state.imagePreview && state.imagePreview !== state.imagePreviewAfter) {
+        const resAfter = await fetch(state.imagePreviewAfter)
+        const blobAfter = await resAfter.blob()
+        const fileNameAfter = `${user.id}-${Date.now()}-after.jpg`
+        const { error: uploadAfterError } = await supabase.storage.from('posts').upload(fileNameAfter, blobAfter)
+        if (!uploadAfterError) {
+          const { data: urlAfter } = supabase.storage.from('posts').getPublicUrl(fileNameAfter)
+          imageUrlAfter = urlAfter.publicUrl
+        }
+      }
+
       const { error: insertError } = await supabase.from('posts').insert({
         user_id: user.id,
         image_url: publicUrlData.publicUrl,
+        image_url_after: imageUrlAfter ?? null,
         description: description.trim(),
         hashtags: hashtags
           .split(' ')
@@ -108,7 +111,14 @@ export function SharePost() {
       <div className="space-y-6">
         {/* Image preview */}
         <div className="rounded-2xl border border-zinc-800 overflow-hidden">
-          <img src={state.imagePreview} alt="Post preview" className="w-full object-cover" />
+          {state.imagePreviewAfter && state.imagePreview ? (
+            <div className="grid grid-cols-2">
+              <img src={state.imagePreview} alt="Before" className="w-full aspect-square object-cover" />
+              <img src={state.imagePreviewAfter} alt="After" className="w-full aspect-square object-cover" />
+            </div>
+          ) : (
+            <img src={state.imagePreview || state.imagePreviewAfter} alt="Post preview" className="w-full object-cover" />
+          )}
         </div>
 
         {/* Description */}

@@ -279,13 +279,15 @@ export function Upload() {
     }
   }
 
+  const getFirstFoodName = (data: LogMealNutritionResponse) =>
+    (getFoodItemsFromResponse(data)[0]?.name ??
+      (Array.isArray(data.foodName) ? data.foodName[0] : data.foodName)) ??
+    'food'
+
   const handleMeme = async () => {
     setShowMeme(true)
-    const foodName =
-      (result && (getFoodItemsFromResponse(result.data)[0]?.name ??
-        (Array.isArray(result.data.foodName) ? result.data.foodName[0] : result.data.foodName))) ??
-      'food'
-    const searchQuery = typeof foodName === 'string' ? foodName : String(foodName)
+    const foodName = result ? getFirstFoodName(result.data) : 'food'
+    const searchQuery = typeof foodName === 'string' ? foodName : String(foodName ?? 'food')
     setMemeLoading(true)
     setMemeGifUrl(null)
     try {
@@ -304,6 +306,14 @@ export function Upload() {
       return
     }
     navigate('/share-post', { state: { imagePreview: preview } })
+  }
+
+  const handlePostBeforeAfter = () => {
+    if (!previewBefore || !previewAfter) {
+      setError('Please analyze both images first')
+      return
+    }
+    navigate('/share-post', { state: { imagePreview: previewBefore, imagePreviewAfter: previewAfter } })
   }
 
   const foodItems = result ? getFoodItemsFromResponse(result.data) : []
@@ -719,6 +729,48 @@ export function Upload() {
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
               <span className="text-emerald-400">+{resultBeforeAfter.exp} XP</span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowMeme(true)
+                const foodName = getFirstFoodName(resultBeforeAfter.before)
+                setMemeLoading(true)
+                setMemeGifUrl(null)
+                searchGifs(typeof foodName === 'string' ? foodName : String(foodName ?? 'food'), 1)
+                  .then((gif) => setMemeGifUrl(gif?.url ?? null))
+                  .catch(() => setMemeGifUrl(null))
+                  .finally(() => setMemeLoading(false))
+              }}
+              className="w-full py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 font-medium hover:bg-amber-500/30 touch-manipulation"
+            >
+              Turn into meme
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePostBeforeAfter}
+              className="w-full py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 font-medium hover:bg-emerald-600/30 touch-manipulation"
+            >
+              Post online
+            </button>
+
+            {showMeme && (
+              <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+                <p className="text-sm text-zinc-500 mb-2">GIF for your food</p>
+                <div className="aspect-video bg-zinc-800 rounded-xl overflow-hidden flex items-center justify-center">
+                  {memeLoading ? (
+                    <p className="text-zinc-500">Loading GIF...</p>
+                  ) : memeGifUrl ? (
+                    <img src={memeGifUrl} alt="Food GIF" className="w-full h-full object-contain" />
+                  ) : (
+                    <p className="text-zinc-500 text-center px-4">
+                      No GIF found. Add VITE_KLIPY_API_KEY to .env (get free key at partner.klipy.com)
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {(getMacrosFromNutrition(resultBeforeAfter.before.nutritional_info?.totalNutrients).length > 0 ||
               getMacrosFromNutrition(resultBeforeAfter.after.nutritional_info?.totalNutrients).length > 0) && (

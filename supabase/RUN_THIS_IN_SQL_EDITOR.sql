@@ -100,3 +100,48 @@ end;
 $$ language plpgsql security definer;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
+
+-- Posts social features (likes, saves, comments)
+alter table posts add column if not exists likes int default 0;
+alter table posts add column if not exists image_url_after text;
+
+create table if not exists post_likes (
+  user_id uuid references auth.users(id) on delete cascade,
+  post_id uuid references posts(id) on delete cascade,
+  primary key (user_id, post_id)
+);
+alter table post_likes enable row level security;
+drop policy if exists "Anyone can view likes" on post_likes;
+create policy "Anyone can view likes" on post_likes for select using (true);
+drop policy if exists "Users can like posts" on post_likes;
+create policy "Users can like posts" on post_likes for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can unlike" on post_likes;
+create policy "Users can unlike" on post_likes for delete using (auth.uid() = user_id);
+
+create table if not exists post_saves (
+  user_id uuid references auth.users(id) on delete cascade,
+  post_id uuid references posts(id) on delete cascade,
+  primary key (user_id, post_id)
+);
+alter table post_saves enable row level security;
+drop policy if exists "Users can view own saves" on post_saves;
+create policy "Users can view own saves" on post_saves for select using (auth.uid() = user_id);
+drop policy if exists "Users can save posts" on post_saves;
+create policy "Users can save posts" on post_saves for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can unsave" on post_saves;
+create policy "Users can unsave" on post_saves for delete using (auth.uid() = user_id);
+
+create table if not exists post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid references posts(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  text text not null,
+  created_at timestamptz default now()
+);
+alter table post_comments enable row level security;
+drop policy if exists "Anyone can view comments" on post_comments;
+create policy "Anyone can view comments" on post_comments for select using (true);
+drop policy if exists "Users can add comments" on post_comments;
+create policy "Users can add comments" on post_comments for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can delete own comments" on post_comments;
+create policy "Users can delete own comments" on post_comments for delete using (auth.uid() = user_id);
