@@ -109,6 +109,41 @@ export async function getMemeCaptionForGif(foodName: string, _gifUrl: string): P
 }
 
 /**
+ * Use Gemini to turn a list of food items into one concise dish name (e.g. "Monster Energy Zero Sugar" or "Grilled chicken salad")
+ */
+export async function getDishNameFromItems(foodNames: string[]): Promise<string> {
+  const key = getApiKey()
+  if (!key || foodNames.length === 0) return ''
+
+  try {
+    const items = foodNames.filter(Boolean).join(', ')
+    if (!items) return ''
+
+    const res = await fetch(`${GEMINI_API}?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Given these detected food/drink items: "${items}". Reply with ONE short dish name (3-6 words) that best describes this meal or item. Examples: "Monster Energy Zero Sugar", "Grilled chicken salad", "Coffee and pastry". Reply with ONLY the dish name, no quotes or punctuation.`
+          }],
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 64,
+        },
+      }),
+    })
+    if (!res.ok) return ''
+    const data = await res.json()
+    const name = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+    return name || ''
+  } catch {
+    return ''
+  }
+}
+
+/**
  * Generate a short caption for a food image (for calendar display)
  */
 export async function getFoodImageCaption(imageUrl: string): Promise<string> {

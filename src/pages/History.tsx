@@ -9,7 +9,7 @@ import {
   type NutritionalData,
   type DetectedItem,
 } from '../lib/analyses'
-import { getFoodImageCaption } from '../lib/gemini'
+import { getFoodImageCaption, getDishNameFromItems } from '../lib/gemini'
 import { getUserStats } from '../lib/stats'
 import {
   getAchievementsByCategory,
@@ -53,17 +53,29 @@ function AnalysisDetail({
   const macros = nutritionalData?.totalNutrients ?? {}
   const detectedItems: DetectedItem[] = nutritionalData?.detectedItems ?? []
 
+  const dishNameFromItems =
+    detectedItems.length > 0
+      ? detectedItems.map((i) => i.name).join(', ')
+      : null
+
   const displayTitle =
     analysis.title?.trim() ||
     caption ||
+    dishNameFromItems ||
     (analysis.type === 'before_after' ? 'Before/After' : 'Calorie analysis')
 
   useEffect(() => {
     if (analysis.title?.trim() || !import.meta.env.VITE_GEMINI_API_KEY) return
-    getFoodImageCaption(analysis.image_url)
-      .then(setCaption)
-      .catch(() => setCaption(null))
-  }, [analysis.image_url, analysis.title])
+    if (detectedItems.length > 0) {
+      getDishNameFromItems(detectedItems.map((i) => i.name))
+        .then((name) => name && setCaption(name))
+        .catch(() => setCaption(null))
+    } else {
+      getFoodImageCaption(analysis.image_url)
+        .then((name) => name && setCaption(name))
+        .catch(() => setCaption(null))
+    }
+  }, [analysis.image_url, analysis.title, detectedItems])
 
   const hasDetails = (macros && Object.keys(macros).length > 0) || detectedItems.length > 0
 
