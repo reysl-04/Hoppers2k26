@@ -1,4 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import {
+  getAnalysesByDate,
+  getAnalysesByMonth,
+  type FoodAnalysis,
+} from '../lib/analyses'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -11,8 +17,12 @@ const ACHIEVEMENTS = [
 ]
 
 export function History() {
+  const { user } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [analysesByDate, setAnalysesByDate] = useState<Record<string, number>>({})
+  const [selectedAnalyses, setSelectedAnalyses] = useState<FoodAnalysis[]>([])
+  const [loading, setLoading] = useState(false)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -25,6 +35,29 @@ export function History() {
 
   const formatDateKey = (day: number) =>
     `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+  useEffect(() => {
+    if (!user?.id) return
+    getAnalysesByMonth(user.id, year, month)
+      .then(setAnalysesByDate)
+      .catch(() => setAnalysesByDate({}))
+  }, [user?.id, year, month])
+
+  useEffect(() => {
+    if (!user?.id || !selectedDate) {
+      setSelectedAnalyses([])
+      return
+    }
+    setLoading(true)
+    getAnalysesByDate(user.id, selectedDate)
+      .then(setSelectedAnalyses)
+      .catch(() => setSelectedAnalyses([]))
+      .finally(() => setLoading(false))
+  }, [user?.id, selectedDate])
+
+  const handleDateClick = (dateKey: string) => {
+    setSelectedDate(dateKey)
+  }
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
@@ -68,18 +101,24 @@ export function History() {
             {days.map((day) => {
               const dateKey = formatDateKey(day)
               const isSelected = selectedDate === dateKey
+              const hasData = (analysesByDate[dateKey] ?? 0) > 0
               return (
                 <button
                   key={day}
                   type="button"
-                  onClick={() => setSelectedDate(dateKey)}
-                  className={`aspect-square rounded-lg text-sm font-medium touch-manipulation transition-colors ${
+                  onClick={() => handleDateClick(dateKey)}
+                  className={`aspect-square rounded-lg text-sm font-medium touch-manipulation transition-colors relative ${
                     isSelected
                       ? 'bg-emerald-600 text-white'
-                      : 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-700'
+                      : hasData
+                        ? 'bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/50'
+                        : 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-700'
                   }`}
                 >
                   {day}
+                  {hasData && !isSelected && (
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />
+                  )}
                 </button>
               )
             })}
@@ -88,10 +127,69 @@ export function History() {
 
         {selectedDate && (
           <div className="mt-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-            <h3 className="font-medium text-zinc-300 mb-2">{selectedDate}</h3>
-            <p className="text-sm text-zinc-500">
-              No uploads on this day. Tap Upload to log your first meal!
-            </p>
+            <h3 className="font-medium text-zinc-300 mb-3">{selectedDate}</h3>
+            {loading ? (
+              <p className="text-sm text-zinc-500">Loading...</p>
+            ) : selectedAnalyses.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No uploads on this day. Tap Upload to log your first meal!
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {selectedAnalyses.map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700"
+                  >
+                    <div className="flex gap-3 p-3">
+                      <img
+                        src={a.image_url}
+                        alt="Food"
+                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-zinc-200">
+                          {a.type === 'before_after' ? 'Before/After' : 'Calorie'} analysis
+                        </p>
+                        <p className="text-lg font-bold text-emerald-400">
+                          {Math.round(a.calories)} cal
+                        </p>
+                        {a.type === 'before_after' && (
+                          <div className="mt-1 flex gap-2 text-xs">
+                            <span className="text-emerald-400">
+                              Consumed: {Math.round(a.calories_consumed ?? 0)}
+                            </span>
+                            <span className="text-red-400">
+                              Waste: {Math.round(a.food_waste_calories ?? 0)} cal
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {a.type === 'before_after' && a.image_url_after && (
+                      <div className="px-3 pb-3 flex gap-2">
+                        <div className="flex-1">
+                          <p className="text-xs text-zinc-500 mb-1">Before</p>
+                          <img
+                            src={a.image_url}
+                            alt="Before"
+                            className="w-full aspect-video object-cover rounded-lg"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs text-zinc-500 mb-1">After</p>
+                          <img
+                            src={a.image_url_after}
+                            alt="After"
+                            className="w-full aspect-video object-cover rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -126,7 +224,7 @@ export function History() {
       <div className="mt-8 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
         <h3 className="font-semibold text-emerald-400 mb-2">Stay within your limits!</h3>
         <p className="text-sm text-zinc-400">
-          Every day you stay within your calorie goal, you earn bonus XP and get closer to 
+          Every day you stay within your calorie goal, you earn bonus XP and get closer to
           unlocking achievements. Your body and the planet will thank you.
         </p>
       </div>

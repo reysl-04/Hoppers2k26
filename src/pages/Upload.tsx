@@ -5,6 +5,8 @@ import {
   type LogMealNutritionResponse,
   type LogMealNutrient,
 } from '../lib/logmeal'
+import { saveCalorieAnalysis, saveBeforeAfterAnalysis } from '../lib/analyses'
+import { useAuth } from '../contexts/AuthContext'
 
 const XP_PER_ANALYSIS = 10
 
@@ -64,6 +66,7 @@ function getFoodItemsFromResponse(data: LogMealNutritionResponse): Array<{
 }
 
 export function Upload() {
+  const { user } = useAuth()
   const [mode, setMode] = useState<AnalyzerMode>(null)
   const [file, setFile] = useState<File | null>(null)
   const [fileBefore, setFileBefore] = useState<File | null>(null)
@@ -147,6 +150,19 @@ export function Upload() {
         data,
         exp: XP_PER_ANALYSIS,
       })
+      if (user?.id) {
+        try {
+          await saveCalorieAnalysis({
+            userId: user.id,
+            imageFile: file,
+            calories: data.nutritional_info?.calories ?? 0,
+            nutritionalData: data.nutritional_info ? { totalNutrients: data.nutritional_info.totalNutrients } : undefined,
+            expEarned: XP_PER_ANALYSIS,
+          })
+        } catch (saveErr) {
+          setError(saveErr instanceof Error ? saveErr.message : 'Analysis saved but failed to store. Check Supabase setup.')
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze image')
     } finally {
@@ -172,11 +188,31 @@ export function Upload() {
         analyzeFoodImage(fileBefore),
         analyzeFoodImage(fileAfter),
       ])
+      const caloriesBefore = before.nutritional_info?.calories ?? 0
+      const caloriesAfter = after.nutritional_info?.calories ?? 0
+      const caloriesConsumed = Math.max(0, caloriesBefore - caloriesAfter)
       setResultBeforeAfter({
         before,
         after,
         exp: XP_PER_ANALYSIS * 2,
       })
+      if (user?.id) {
+        try {
+          await saveBeforeAfterAnalysis({
+            userId: user.id,
+            imageFileBefore: fileBefore,
+            imageFileAfter: fileAfter,
+            caloriesBefore,
+            caloriesAfter,
+            caloriesConsumed,
+            foodWasteCalories: caloriesAfter,
+            nutritionalData: before.nutritional_info ? { totalNutrients: before.nutritional_info.totalNutrients } : undefined,
+            expEarned: XP_PER_ANALYSIS * 2,
+          })
+        } catch (saveErr) {
+          setError(saveErr instanceof Error ? saveErr.message : 'Analysis saved but failed to store. Check Supabase setup.')
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze images')
     } finally {

@@ -32,9 +32,11 @@ A mobile-first SPA for sustainable food tracking, calorie management, and reduci
      VITE_SUPABASE_ANON_KEY=your_anon_key
      ```
 
-3. **Enable Google Auth** – See [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md) for step-by-step setup in Google Cloud Console and Supabase.
+3. **Database & Storage** – Run the migration and create the storage bucket. See [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
 
-4. **Run dev server**
+4. **Enable Google Auth** – See [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md) for step-by-step setup in Google Cloud Console and Supabase.
+
+5. **Run dev server**
    ```bash
    npm run dev
    ```
@@ -60,4 +62,5 @@ A mobile-first SPA for sustainable food tracking, calorie management, and reduci
 4. Add environment variables in the Render dashboard:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_LOGMEAL_API_KEY`
 5. In Supabase Auth → URL Configuration, add your Render URL (e.g. `https://zerocrust.onrender.com`) to **Redirect URLs**
