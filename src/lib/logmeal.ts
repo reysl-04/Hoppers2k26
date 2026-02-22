@@ -108,11 +108,13 @@ export async function getNutritionalInfo(imageId: number): Promise<LogMealNutrit
 }
 
 /**
- * Full flow: segment image, then fetch nutrition
+ * Full flow: resize/compress for API limits (1MB, 1000px), segment, then fetch nutrition
  */
 export async function analyzeFoodImage(
   imageFile: File
 ): Promise<LogMealNutritionResponse> {
-  const segmentation = await segmentImage(imageFile)
+  const { resizeForLogMeal } = await import('./imageResize')
+  const resized = await resizeForLogMeal(imageFile)
+  const segmentation = await segmentImage(resized)
   return getNutritionalInfo(segmentation.imageId)
 }
