@@ -65,7 +65,7 @@ export function WelcomeScene({ onComplete }: WelcomeSceneProps) {
             <div className="floating-element element-5">🥕</div>
           </div>
         </div>
-        <p className="welcome-instruction">Click anywhere or scroll to continue</p>
+        <p className="welcome-instruction">Click anywhere or scroll to continu</p>
       </div>
     </div>
   )
