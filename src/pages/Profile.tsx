@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { upsertProfile } from '../lib/profiles'
 import { getUserStats, levelFromXp } from '../lib/stats'
 import type { UserStats } from '../lib/stats'
 
@@ -31,6 +32,14 @@ export function Profile() {
   useEffect(() => {
     if (!user?.id) return
     getUserStats(user.id).then(setStats).catch(() => {})
+    // Sync user_metadata to profiles so posts show correct name/avatar
+    const meta = user.user_metadata
+    if (meta?.full_name || meta?.avatar_url) {
+      upsertProfile(user.id, {
+        full_name: meta.full_name ?? undefined,
+        avatar_url: meta.avatar_url ?? undefined,
+      }).catch(() => {})
+    }
     
     // Fetch user's posts
     const loadUserPosts = async () => {
@@ -109,6 +118,16 @@ export function Profile() {
       description: description,
       avatar_url: avatarUrl || undefined
     })
+    if (!error && user?.id) {
+      try {
+        await upsertProfile(user.id, {
+          full_name: displayName || undefined,
+          avatar_url: avatarUrl || undefined,
+        })
+      } catch {
+        // Profile upsert failed - user_metadata still updated
+      }
+    }
     setLoading(false)
     
     if (error) {

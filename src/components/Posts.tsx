@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { getProfilesByIds } from '../lib/profiles'
 
 interface Post {
   id: string
@@ -70,8 +71,15 @@ export function Posts() {
         return
       }
 
-      const mapped = (data as DbPost[]).map((post) => {
-        const username = post.user_id.slice(0, 8)
+      const postsData = data as DbPost[]
+      const userIds = [...new Set(postsData.map((p) => p.user_id))]
+      const profiles = await getProfilesByIds(userIds)
+
+      const mapped = postsData.map((post) => {
+        const profile = profiles[post.user_id]
+        const name = profile?.full_name?.trim() || `User ${post.user_id.slice(0, 8)}`
+        const avatar = profile?.avatar_url || fallbackAvatar
+        const username = name.replace(/\s+/g, '').toLowerCase() || post.user_id.slice(0, 8)
         const tags = post.hashtags
           ? post.hashtags
               .split(' ')
@@ -83,8 +91,8 @@ export function Posts() {
           id: post.id,
           user_id: post.user_id,
           user: {
-            name: `User ${username}`,
-            avatar: fallbackAvatar,
+            name,
+            avatar,
             username,
           },
           image: post.image_url,
