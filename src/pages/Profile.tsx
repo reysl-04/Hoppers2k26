@@ -35,6 +35,15 @@ export function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const meta = user?.user_metadata
+    if (meta) {
+      setDisplayName(meta.full_name ?? '')
+      setDescription(meta.description ?? '')
+      setAvatarPreview(meta.avatar_url ?? null)
+    }
+  }, [user?.user_metadata?.full_name, user?.user_metadata?.description, user?.user_metadata?.avatar_url])
+
+  useEffect(() => {
     if (!user?.id) return
     getUserStats(user.id).then(setStats).catch(() => {})
     // Sync user_metadata to profiles so posts show correct name/avatar
@@ -137,13 +146,14 @@ export function Profile() {
       }
     }
     setLoading(false)
-    
+
     if (error) {
       console.error('Error updating profile:', error)
       return
     }
-    
-    setAvatarFile(null) // Clear the file after successful upload
+
+    setAvatarFile(null)
+    if (avatarUrl) setAvatarPreview(avatarUrl)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

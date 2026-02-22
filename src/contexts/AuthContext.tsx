@@ -68,14 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null }
   }
 
-  const updateUser = async (updates: { full_name?: string; description?: string }) => {
+  const updateUser = async (updates: { full_name?: string; description?: string; avatar_url?: string }) => {
     const { error } = await supabase.auth.updateUser({
-      data: updates
+      data: updates,
     })
     if (!error) {
-      // Refresh the user data
       const { data: { user: updatedUser } } = await supabase.auth.getUser()
-      setUser(updatedUser)
+      if (updatedUser) setUser(updatedUser)
     }
     return { error: error as Error | null }
   }
