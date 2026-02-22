@@ -64,7 +64,7 @@ export function WelcomeScene({ onComplete }: WelcomeSceneProps) {
     >
       <div className="welcome-content">
         <h2 className="welcome-title">ZeroCrumb</h2>
-        <p className="welcome-subtitle">Your Personal Companion for Healthy Eating</p>
+        <p className="welcome-subtitle">Your Personal Companion for\n Healthy Eating</p>
         <div className="welcome-animation">
           <div className="floating-elements">
             <div className="floating-element element-1">🥗</div>
