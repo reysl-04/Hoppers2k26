@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getUserStats, levelFromXp } from '../lib/stats'
+import type { UserStats } from '../lib/stats'
 
 export function Profile() {
   const { user, updateUser } = useAuth()
@@ -11,7 +13,17 @@ export function Profile() {
   const [loading, setLoading] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.user_metadata?.avatar_url ?? null)
+  const [stats, setStats] = useState<UserStats | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    getUserStats(user.id).then(setStats).catch(() => {})
+  }, [user?.id])
+
+  const { level, xpInLevel, xpNeededForNext } = stats
+    ? levelFromXp(stats.total_xp)
+    : { level: 1, xpInLevel: 0, xpNeededForNext: 100.5 }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -147,11 +159,18 @@ export function Profile() {
         <h2 className="font-semibold text-zinc-300 mb-3">Quick Stats</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-            <p className="text-2xl font-bold text-emerald-400">0</p>
+            <p className="text-2xl font-bold text-emerald-400">{stats?.total_xp ?? 0}</p>
             <p className="text-sm text-zinc-500">Total XP</p>
+            <p className="text-xs text-zinc-600 mt-1">Level {level}</p>
+            <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full"
+                style={{ width: `${xpNeededForNext > 0 ? (xpInLevel / xpNeededForNext) * 100 : 100}%` }}
+              />
+            </div>
           </div>
           <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-            <p className="text-2xl font-bold text-amber-400">0</p>
+            <p className="text-2xl font-bold text-amber-400">{stats?.total_meals_logged ?? 0}</p>
             <p className="text-sm text-zinc-500">Meals tracked</p>
           </div>
         </div>

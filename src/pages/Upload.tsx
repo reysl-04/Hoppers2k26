@@ -7,6 +7,8 @@ import {
 } from '../lib/logmeal'
 import { analyzeFoodWithGemini, type GeminiFoodAnalysis } from '../lib/gemini'
 import { saveCalorieAnalysis, saveBeforeAfterAnalysis } from '../lib/analyses'
+import { updateStatsOnMealLog } from '../lib/stats'
+import { checkAndAwardAchievements } from '../lib/achievements'
 import { useAuth } from '../contexts/AuthContext'
 
 const XP_PER_ANALYSIS = 10
@@ -167,18 +169,24 @@ export function Upload() {
       if (user?.id) {
         try {
           const foodItems = getFoodItemsFromResponse(data)
+          const calories = data.nutritional_info?.calories ?? 0
+          const nutritionalData = data.nutritional_info
+            ? { totalNutrients: data.nutritional_info.totalNutrients, detectedItems: foodItems }
+            : undefined
           await saveCalorieAnalysis({
             userId: user.id,
             imageFile: file,
-            calories: data.nutritional_info?.calories ?? 0,
-            nutritionalData: data.nutritional_info
-              ? {
-                  totalNutrients: data.nutritional_info.totalNutrients,
-                  detectedItems: foodItems,
-                }
-              : undefined,
+            calories,
+            nutritionalData,
             expEarned: XP_PER_ANALYSIS,
           })
+          const stats = await updateStatsOnMealLog(user.id, {
+            type: 'calorie',
+            calories,
+            nutritionalData,
+            expEarned: XP_PER_ANALYSIS,
+          })
+          await checkAndAwardAchievements(user.id, stats)
         } catch (saveErr) {
           setError(saveErr instanceof Error ? saveErr.message : 'Analysis saved but failed to store. Check Supabase setup.')
         }
@@ -233,6 +241,9 @@ export function Upload() {
       if (user?.id) {
         try {
           const foodItems = getFoodItemsFromResponse(before)
+          const nutritionalData = before.nutritional_info
+            ? { totalNutrients: before.nutritional_info.totalNutrients, detectedItems: foodItems }
+            : undefined
           await saveBeforeAfterAnalysis({
             userId: user.id,
             imageFileBefore: fileBefore,
@@ -241,14 +252,18 @@ export function Upload() {
             caloriesAfter,
             caloriesConsumed,
             foodWasteCalories: caloriesAfter,
-            nutritionalData: before.nutritional_info
-              ? {
-                  totalNutrients: before.nutritional_info.totalNutrients,
-                  detectedItems: foodItems,
-                }
-              : undefined,
+            nutritionalData,
             expEarned: XP_PER_ANALYSIS * 2,
           })
+          const stats = await updateStatsOnMealLog(user.id, {
+            type: 'before_after',
+            calories: caloriesBefore,
+            caloriesConsumed,
+            foodWasteCalories: caloriesAfter,
+            nutritionalData,
+            expEarned: XP_PER_ANALYSIS * 2,
+          })
+          await checkAndAwardAchievements(user.id, stats)
         } catch (saveErr) {
           setError(saveErr instanceof Error ? saveErr.message : 'Analysis saved but failed to store. Check Supabase setup.')
         }

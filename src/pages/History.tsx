@@ -7,16 +7,16 @@ import {
   type NutritionalData,
 } from '../lib/analyses'
 import { getFoodImageCaption } from '../lib/gemini'
+import { getUserStats } from '../lib/stats'
+import {
+  getAchievementsByCategory,
+  getUnlockedAchievementIds,
+  type AchievementDef,
+} from '../lib/achievements'
+import type { UserStats } from '../lib/stats'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-const ACHIEVEMENTS = [
-  { id: '1', title: 'First Bite', description: 'Log your first meal', icon: '🍽️', progress: 0, target: 1 },
-  { id: '2', title: 'Week Warrior', description: 'Track 7 days in a row', icon: '🔥', progress: 0, target: 7 },
-  { id: '3', title: 'Calorie Champion', description: 'Stay within limit 5 days', icon: '🏆', progress: 0, target: 5 },
-  { id: '4', title: 'Zero Waste Hero', description: 'Reduce waste 10 times', icon: '🌱', progress: 0, target: 10 },
-]
 
 const MACRO_KEYS = ['ENERC_KCAL', 'PROCNT', 'CHOCDF', 'FAT', 'FIBTG', 'SUGAR'] as const
 const MACRO_LABELS: Record<string, string> = {
@@ -156,6 +156,103 @@ function AnalysisDetail({ analysis }: { analysis: FoodAnalysis }) {
   )
 }
 
+function AchievementCategoryCard({
+  category,
+  achievements,
+  stats,
+  unlocked,
+  expanded,
+  onToggle,
+}: {
+  category: string
+  achievements: AchievementDef[]
+  stats: UserStats
+  unlocked: Set<string>
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const first = achievements[0]
+  const categoryIcon = first?.categoryIcon ?? '🏆'
+  const inProgress = achievements.find((a) => !unlocked.has(a.id))
+  const displayAchievement = inProgress ?? achievements[achievements.length - 1]
+  const { current, target } = displayAchievement.getProgress(stats)
+  const isComplete = unlocked.has(displayAchievement.id)
+  const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0
+
+  return (
+    <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+              {categoryIcon} {category}
+            </p>
+            <h3 className="font-medium text-zinc-200 truncate">
+              {displayAchievement.icon} {displayAchievement.title}
+            </h3>
+            <p className="text-sm text-zinc-500 mt-0.5">{displayAchievement.condition}</p>
+            <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${isComplete ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <p className="text-sm text-zinc-400 mt-1">
+              {current}/{target}
+              {isComplete && <span className="text-amber-400 ml-1">✓</span>}
+            </p>
+          </div>
+          {achievements.length > 1 && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="flex-shrink-0 p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+            >
+              <svg
+                className={`w-5 h-5 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {expanded && achievements.length > 1 && (
+          <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
+            {achievements.map((a) => {
+              const { current: c, target: t } = a.getProgress(stats)
+              const done = unlocked.has(a.id)
+              const p = t > 0 ? Math.min(100, (c / t) * 100) : 0
+              return (
+                <div key={a.id} className="flex items-center gap-3">
+                  <span className="text-lg">{a.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-zinc-300">{a.title}</p>
+                    <p className="text-xs text-zinc-500">{a.condition} · {a.reward} XP</p>
+                    <div className="mt-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${done ? 'bg-amber-500' : 'bg-emerald-500/70'}`}
+                        style={{ width: `${p}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-sm text-zinc-400">
+                    {c}/{t}
+                    {done && <span className="text-amber-400"> ✓</span>}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function History() {
   const { user } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -163,6 +260,9 @@ export function History() {
   const [analysesByDate, setAnalysesByDate] = useState<Record<string, number>>({})
   const [selectedAnalyses, setSelectedAnalyses] = useState<FoodAnalysis[]>([])
   const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState<UserStats | null>(null)
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set())
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -194,6 +294,16 @@ export function History() {
       .catch(() => setSelectedAnalyses([]))
       .finally(() => setLoading(false))
   }, [user?.id, selectedDate])
+
+  useEffect(() => {
+    if (!user?.id) return
+    Promise.all([getUserStats(user.id), getUnlockedAchievementIds(user.id)])
+      .then(([s, ids]) => {
+        setStats(s)
+        setUnlockedIds(ids)
+      })
+      .catch(() => {})
+  }, [user?.id])
 
   const handleDateClick = (dateKey: string) => {
     setSelectedDate(dateKey)
@@ -312,27 +422,25 @@ export function History() {
       <section>
         <h2 className="font-semibold text-zinc-300 mb-3">Achievements</h2>
         <div className="space-y-3">
-          {ACHIEVEMENTS.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800"
-            >
-              <span className="text-2xl opacity-60">{a.icon}</span>
-              <div className="flex-1">
-                <h3 className="font-medium text-zinc-200">{a.title}</h3>
-                <p className="text-sm text-zinc-500">{a.description}</p>
-                <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (a.progress / a.target) * 100)}%` }}
-                  />
-                </div>
-              </div>
-              <span className="text-sm text-zinc-500">
-                {a.progress}/{a.target}
-              </span>
-            </div>
-          ))}
+          {stats &&
+            Array.from(getAchievementsByCategory().entries()).map(([category, achievements]) => (
+              <AchievementCategoryCard
+                key={category}
+                category={category}
+                achievements={achievements}
+                stats={stats}
+                unlocked={unlockedIds}
+                expanded={expandedCategories.has(category)}
+                onToggle={() =>
+                  setExpandedCategories((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(category)) next.delete(category)
+                    else next.add(category)
+                    return next
+                  })
+                }
+              />
+            ))}
         </div>
       </section>
 
