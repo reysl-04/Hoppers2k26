@@ -112,6 +112,27 @@ create table if not exists post_likes (
   primary key (user_id, post_id)
 );
 alter table post_likes enable row level security;
+
+-- Trigger: keep posts.likes in sync with post_likes (bypasses RLS)
+create or replace function public.sync_post_likes_count()
+returns trigger as $$
+begin
+  if TG_OP = 'INSERT' then
+    update posts set likes = coalesce(likes, 0) + 1 where id = NEW.post_id;
+  elsif TG_OP = 'DELETE' then
+    update posts set likes = greatest(coalesce(likes, 0) - 1, 0) where id = OLD.post_id;
+  end if;
+  return null;
+end;
+$$ language plpgsql security definer;
+drop trigger if exists sync_post_likes_trigger on post_likes;
+create trigger sync_post_likes_trigger
+  after insert or delete on post_likes
+  for each row execute procedure public.sync_post_likes_count();
+
+-- Backfill: sync posts.likes with actual post_likes count (run once)
+update posts p set likes = (select count(*)::int from post_likes pl where pl.post_id = p.id);
+
 drop policy if exists "Anyone can view likes" on post_likes;
 create policy "Anyone can view likes" on post_likes for select using (true);
 drop policy if exists "Users can like posts" on post_likes;

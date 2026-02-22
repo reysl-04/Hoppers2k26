@@ -6,8 +6,8 @@ export async function toggleLike(postId: string, userId: string, isLiked: boolea
   } else {
     await supabase.from('post_likes').insert({ post_id: postId, user_id: userId })
   }
+  // posts.likes is kept in sync by DB trigger sync_post_likes_count
   const { count } = await supabase.from('post_likes').select('*', { count: 'exact', head: true }).eq('post_id', postId)
-  await supabase.from('posts').update({ likes: count ?? 0 }).eq('id', postId)
   return count ?? 0
 }
 
