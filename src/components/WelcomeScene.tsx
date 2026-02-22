@@ -63,7 +63,7 @@ export function WelcomeScene({ onComplete }: WelcomeSceneProps) {
       onClick={handleClick}
     >
       <div className="welcome-content">
-        <h2 className="welcome-title">ZeroCrust</h2>
+        <h2 className="welcome-title">ZeroCrumb</h2>
         <p className="welcome-subtitle">Your personal companion for sustainable eating</p>
         <div className="welcome-animation">
           <div className="floating-elements">
