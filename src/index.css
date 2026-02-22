@@ -13,6 +13,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:hover {
+  cursor: pointer;
+}
+
 /* Melting Animation Keyframes */
 @keyframes melt0 {
   0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
@@ -66,7 +70,7 @@ body {
   height: 100vh;
   z-index: 9999;
   cursor: pointer;
-  transition: all 1s ease-in-out;
+  transition: all 0.5s ease-in-out;
 }
 
 .welcome-scene.toggled {

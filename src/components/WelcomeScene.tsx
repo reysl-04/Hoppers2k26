@@ -14,8 +14,8 @@ export function WelcomeScene({ onComplete }: WelcomeSceneProps) {
     // Wait for animation to complete before calling onComplete
     setTimeout(() => {
       onComplete()
-    }, 1000) // Match the CSS transition duration
-  }, 100) // 1 second delay ← This is the delay value
+    }, 500) // Match the CSS transition duration
+  }, 50) // 1 second delay ← This is the delay value
 }, [onComplete])
 
   const handleClick = useCallback(() => {
@@ -47,6 +47,15 @@ export function WelcomeScene({ onComplete }: WelcomeSceneProps) {
       window.removeEventListener('touchmove', handleTouchMove)
     }
   }, [handleScroll])
+
+  // Auto-dismiss after 1 second
+  useEffect(() => {
+    const autoTimer = setTimeout(() => {
+      handleDismiss()
+    }, 1000)
+
+    return () => clearTimeout(autoTimer)
+  }, [handleDismiss])
 
   return (
     <div

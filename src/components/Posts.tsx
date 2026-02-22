@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 
 interface Post {
   id: string
@@ -15,85 +16,108 @@ interface Post {
   tags: string[]
 }
 
-// Mock data for demonstration
-const mockPosts: Post[] = [
-  {
-    id: '1',
-    user: {
-      name: 'Sarah Chen',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      username: 'sarahc'
-    },
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&h=500&fit=crop',
-    caption: 'Fresh salad with locally sourced veggies! 🌱 #sustainable #zerocrust',
-    likes: 24,
-    comments: 3,
-    timestamp: '2h',
-    tags: ['sustainable', 'zerocrust']
-  },
-  {
-    id: '2',
-    user: {
-      name: 'Mike Johnson',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      username: 'mikej'
-    },
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=500&h=500&fit=crop',
-    caption: 'Zero waste meal prep for the week! No food left behind 💚',
-    likes: 18,
-    comments: 5,
-    timestamp: '4h',
-    tags: ['zerowaste', 'mealprep']
-  },
-  {
-    id: '3',
-    user: {
-      name: 'Emma Davis',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-      username: 'emmad'
-    },
-    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=500&h=500&fit=crop',
-    caption: 'Homemade veggie stir-fry using leftover ingredients. Delicious and planet-friendly! 🌍🍲',
-    likes: 31,
-    comments: 7,
-    timestamp: '6h',
-    tags: ['homemade', 'veggie']
-  },
-  {
-    id: '4',
-    user: {
-      name: 'Alex Rodriguez',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      username: 'alexr'
-    },
-    image: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?w=500&h=500&fit=crop',
-    caption: 'Breakfast bowl with organic fruits and nuts. Starting the day right! 🥣✨',
-    likes: 42,
-    comments: 8,
-    timestamp: '8h',
-    tags: ['breakfast', 'organic']
-  },
-  {
-    id: '5',
-    user: {
-      name: 'Lisa Park',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-      username: 'lisap'
-    },
-    image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=500&h=500&fit=crop',
-    caption: 'Sustainable sushi night! Fresh fish from local fishermen. 🐟🌊',
-    likes: 67,
-    comments: 12,
-    timestamp: '12h',
-    tags: ['sushi', 'sustainable']
-  }
-]
+interface DbPost {
+  id: string
+  user_id: string
+  image_url: string
+  description: string
+  hashtags: string | null
+  created_at: string
+  likes: number | null
+}
+
+const fallbackAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face'
+
+const formatTimeAgo = (iso: string) => {
+  const date = new Date(iso)
+  const diffMs = Date.now() - date.getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  return `${days}d`
+}
 
 export function Posts() {
-  const [posts] = useState<Post[]>(mockPosts)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPosts = async () => {
+      setLoading(true)
+      setError(null)
+      const { data, error: fetchError } = await supabase
+        .from('posts')
+        .select('id, user_id, image_url, description, hashtags, created_at, likes')
+        .order('created_at', { ascending: false })
+
+      if (!isMounted) return
+
+      if (fetchError) {
+        setError(fetchError.message)
+        setPosts([])
+        setLoading(false)
+        return
+      }
+
+      const mapped = (data as DbPost[]).map((post) => {
+        const username = post.user_id.slice(0, 8)
+        const tags = post.hashtags
+          ? post.hashtags
+              .split(' ')
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+          : []
+
+        return {
+          id: post.id,
+          user: {
+            name: `User ${username}`,
+            avatar: fallbackAvatar,
+            username,
+          },
+          image: post.image_url,
+          caption: post.description,
+          likes: post.likes ?? 0,
+          comments: 0,
+          timestamp: formatTimeAgo(post.created_at),
+          tags,
+        }
+      })
+
+      setPosts(mapped)
+      setLoading(false)
+    }
+
+    loadPosts()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <div className="max-w-md mx-auto pb-6">
+      {loading && (
+        <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm">
+          Loading posts...
+        </div>
+      )}
+      {error && (
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+      {!loading && !error && posts.length === 0 && (
+        <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm">
+          No posts yet. Be the first to share!
+        </div>
+      )}
       {/* Posts feed */}
       <div className="space-y-6">
         {posts.map((post) => (

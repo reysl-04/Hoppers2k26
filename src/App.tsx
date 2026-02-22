@@ -10,6 +10,7 @@ import { Home } from './pages/Home'
 import { Profile } from './pages/Profile'
 import { History } from './pages/History'
 import { Upload } from './pages/Upload'
+import { SharePost } from './pages/SharePost'
 
 function ProtectedRoute() {
   const { user, loading } = useAuth()
@@ -54,6 +55,7 @@ function AppRoutes() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/history" element={<History />} />
         <Route path="/upload" element={<Upload />} />
+        <Route path="/share-post" element={<SharePost />} />
       </Route>
     </Routes>
   )
