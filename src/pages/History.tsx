@@ -4,7 +4,9 @@ import {
   getAnalysesByDate,
   getAnalysesByMonth,
   type FoodAnalysis,
+  type NutritionalData,
 } from '../lib/analyses'
+import { getFoodImageCaption } from '../lib/gemini'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -15,6 +17,144 @@ const ACHIEVEMENTS = [
   { id: '3', title: 'Calorie Champion', description: 'Stay within limit 5 days', icon: '🏆', progress: 0, target: 5 },
   { id: '4', title: 'Zero Waste Hero', description: 'Reduce waste 10 times', icon: '🌱', progress: 0, target: 10 },
 ]
+
+const MACRO_KEYS = ['ENERC_KCAL', 'PROCNT', 'CHOCDF', 'FAT', 'FIBTG', 'SUGAR'] as const
+const MACRO_LABELS: Record<string, string> = {
+  ENERC_KCAL: 'Calories',
+  PROCNT: 'Protein',
+  CHOCDF: 'Carbs',
+  FAT: 'Fat',
+  FIBTG: 'Fiber',
+  SUGAR: 'Sugar',
+}
+
+function AnalysisDetail({ analysis }: { analysis: FoodAnalysis }) {
+  const [expanded, setExpanded] = useState(false)
+  const [caption, setCaption] = useState<string | null>(null)
+  const nutritionalData = analysis.nutritional_data as NutritionalData | null
+  const macros = nutritionalData?.totalNutrients
+  const detectedItems = nutritionalData?.detectedItems ?? []
+
+  useEffect(() => {
+    if (!import.meta.env.VITE_GEMINI_API_KEY) return
+    getFoodImageCaption(analysis.image_url)
+      .then(setCaption)
+      .catch(() => setCaption(null))
+  }, [analysis.image_url])
+
+  const hasDetails = (macros && Object.keys(macros).length > 0) || detectedItems.length > 0
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700">
+      {/* Header: Food image as title */}
+      <div className="relative">
+        <img
+          src={analysis.image_url}
+          alt="Food"
+          className="w-full aspect-video object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <p className="font-semibold text-white text-lg">
+            {caption || (analysis.type === 'before_after' ? 'Before/After' : 'Calorie analysis')}
+          </p>
+          <p className="text-emerald-400 font-bold">{Math.round(analysis.calories)} cal</p>
+        </div>
+      </div>
+
+      <div className="p-3">
+        {analysis.type === 'before_after' && (
+          <div className="flex gap-2 text-sm mb-2">
+            <span className="text-emerald-400">
+              Consumed: {Math.round(analysis.calories_consumed ?? 0)} cal
+            </span>
+            <span className="text-red-400">
+              Waste: {Math.round(analysis.food_waste_calories ?? 0)} cal
+            </span>
+          </div>
+        )}
+
+        {hasDetails && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-2 text-emerald-400 text-sm font-medium hover:underline"
+          >
+            {expanded ? 'Hide details' : 'View details'}
+            <svg
+              className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
+
+        {expanded && hasDetails && (
+          <div className="mt-3 pt-3 border-t border-zinc-700 space-y-3">
+            {detectedItems.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-zinc-500 uppercase mb-1">Detected items</h4>
+                <ul className="space-y-1">
+                  {detectedItems.map((item, i) => (
+                    <li key={i} className="flex justify-between text-sm">
+                      <span className="text-zinc-300">{item.name}</span>
+                      <span className="text-zinc-400">{Math.round(item.calories)} cal</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {macros && Object.keys(macros).length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-zinc-500 uppercase mb-1">Macronutrients</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {MACRO_KEYS.filter((k) => macros[k]).map((key) => {
+                    const n = macros[key]
+                    const label = n?.label || MACRO_LABELS[key] || key
+                    const value =
+                      n?.quantity != null
+                        ? `${Number(n.quantity).toFixed(1)} ${n?.unit ?? ''}`.trim()
+                        : '-'
+                    return (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-zinc-500">{label}</span>
+                        <span className="text-zinc-300">{value}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {analysis.type === 'before_after' && analysis.image_url_after && (
+        <div className="px-3 pb-3 flex gap-2">
+          <div className="flex-1">
+            <p className="text-xs text-zinc-500 mb-1">Before</p>
+            <img
+              src={analysis.image_url}
+              alt="Before"
+              className="w-full aspect-video object-cover rounded-lg"
+            />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-zinc-500 mb-1">After</p>
+            <img
+              src={analysis.image_url_after}
+              alt="After"
+              className="w-full aspect-video object-cover rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function History() {
   const { user } = useAuth()
@@ -58,6 +198,8 @@ export function History() {
   const handleDateClick = (dateKey: string) => {
     setSelectedDate(dateKey)
   }
+
+  const primaryImage = selectedAnalyses[0]?.image_url
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
@@ -126,70 +268,43 @@ export function History() {
         </div>
 
         {selectedDate && (
-          <div className="mt-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-            <h3 className="font-medium text-zinc-300 mb-3">{selectedDate}</h3>
-            {loading ? (
-              <p className="text-sm text-zinc-500">Loading...</p>
-            ) : selectedAnalyses.length === 0 ? (
-              <p className="text-sm text-zinc-500">
-                No uploads on this day. Tap Upload to log your first meal!
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {selectedAnalyses.map((a) => (
-                  <div
-                    key={a.id}
-                    className="rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700"
-                  >
-                    <div className="flex gap-3 p-3">
-                      <img
-                        src={a.image_url}
-                        alt="Food"
-                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-zinc-200">
-                          {a.type === 'before_after' ? 'Before/After' : 'Calorie'} analysis
-                        </p>
-                        <p className="text-lg font-bold text-emerald-400">
-                          {Math.round(a.calories)} cal
-                        </p>
-                        {a.type === 'before_after' && (
-                          <div className="mt-1 flex gap-2 text-xs">
-                            <span className="text-emerald-400">
-                              Consumed: {Math.round(a.calories_consumed ?? 0)}
-                            </span>
-                            <span className="text-red-400">
-                              Waste: {Math.round(a.food_waste_calories ?? 0)} cal
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {a.type === 'before_after' && a.image_url_after && (
-                      <div className="px-3 pb-3 flex gap-2">
-                        <div className="flex-1">
-                          <p className="text-xs text-zinc-500 mb-1">Before</p>
-                          <img
-                            src={a.image_url}
-                            alt="Before"
-                            className="w-full aspect-video object-cover rounded-lg"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs text-zinc-500 mb-1">After</p>
-                          <img
-                            src={a.image_url_after}
-                            alt="After"
-                            className="w-full aspect-video object-cover rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+          <div className="mt-4 rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+            {/* Day header with food image as title */}
+            <div className="p-3 border-b border-zinc-800 flex items-center gap-3">
+              {primaryImage ? (
+                <img
+                  src={primaryImage}
+                  alt="Day"
+                  className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                  <span className="text-2xl">📅</span>
+                </div>
+              )}
+              <div>
+                <h3 className="font-semibold text-zinc-100">{selectedDate}</h3>
+                <p className="text-sm text-zinc-500">
+                  {selectedAnalyses.length} {selectedAnalyses.length === 1 ? 'entry' : 'entries'}
+                </p>
               </div>
-            )}
+            </div>
+
+            <div className="p-3">
+              {loading ? (
+                <p className="text-sm text-zinc-500">Loading...</p>
+              ) : selectedAnalyses.length === 0 ? (
+                <p className="text-sm text-zinc-500">
+                  No uploads on this day. Tap Upload to log your first meal!
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {selectedAnalyses.map((a) => (
+                    <AnalysisDetail key={a.id} analysis={a} />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>

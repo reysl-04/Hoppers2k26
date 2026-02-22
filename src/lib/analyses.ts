@@ -17,11 +17,21 @@ export interface FoodAnalysis {
   exp_earned: number
 }
 
+export interface DetectedItem {
+  name: string
+  calories: number
+}
+
+export interface NutritionalData {
+  totalNutrients?: Record<string, { label?: string; quantity?: number; unit?: string }>
+  detectedItems?: DetectedItem[]
+}
+
 export interface SaveCalorieAnalysisParams {
   userId: string
   imageFile: File
   calories: number
-  nutritionalData?: Record<string, unknown>
+  nutritionalData?: NutritionalData
   expEarned?: number
 }
 
@@ -33,7 +43,7 @@ export interface SaveBeforeAfterAnalysisParams {
   caloriesAfter: number
   caloriesConsumed: number
   foodWasteCalories: number
-  nutritionalData?: Record<string, unknown>
+  nutritionalData?: NutritionalData
   expEarned?: number
 }
 
@@ -45,7 +55,12 @@ async function uploadImage(userId: string, file: File, suffix: string): Promise<
     upsert: false,
   })
 
-  if (error) throw new Error(`Failed to upload image: ${error.message}`)
+  if (error) {
+    const msg = error.message.includes('Bucket not found')
+      ? 'Storage bucket "food-images" not found. Create it in Supabase Dashboard → Storage → New bucket. See docs/SUPABASE_SETUP.md'
+      : `Failed to upload image: ${error.message}`
+    throw new Error(msg)
+  }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
   return data.publicUrl

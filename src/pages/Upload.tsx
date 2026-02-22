@@ -5,6 +5,7 @@ import {
   type LogMealNutritionResponse,
   type LogMealNutrient,
 } from '../lib/logmeal'
+import { analyzeFoodWithGemini, type GeminiFoodAnalysis } from '../lib/gemini'
 import { saveCalorieAnalysis, saveBeforeAfterAnalysis } from '../lib/analyses'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -80,11 +81,14 @@ export function Upload() {
   const [result, setResult] = useState<{
     data: LogMealNutritionResponse
     exp: number
+    gemini?: GeminiFoodAnalysis
   } | null>(null)
   const [resultBeforeAfter, setResultBeforeAfter] = useState<{
     before: LogMealNutritionResponse
     after: LogMealNutritionResponse
     exp: number
+    geminiBefore?: GeminiFoodAnalysis
+    geminiAfter?: GeminiFoodAnalysis
   } | null>(null)
   const [showMeme, setShowMeme] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -147,17 +151,32 @@ export function Upload() {
 
     try {
       const data = await analyzeFoodImage(file)
+      let geminiResult: GeminiFoodAnalysis | undefined
+      if (import.meta.env.VITE_GEMINI_API_KEY) {
+        try {
+          geminiResult = await analyzeFoodWithGemini(file)
+        } catch {
+          // Gemini optional - ignore errors
+        }
+      }
       setResult({
         data,
         exp: XP_PER_ANALYSIS,
+        gemini: geminiResult,
       })
       if (user?.id) {
         try {
+          const foodItems = getFoodItemsFromResponse(data)
           await saveCalorieAnalysis({
             userId: user.id,
             imageFile: file,
             calories: data.nutritional_info?.calories ?? 0,
-            nutritionalData: data.nutritional_info ? { totalNutrients: data.nutritional_info.totalNutrients } : undefined,
+            nutritionalData: data.nutritional_info
+              ? {
+                  totalNutrients: data.nutritional_info.totalNutrients,
+                  detectedItems: foodItems,
+                }
+              : undefined,
             expEarned: XP_PER_ANALYSIS,
           })
         } catch (saveErr) {
@@ -192,13 +211,28 @@ export function Upload() {
       const caloriesBefore = before.nutritional_info?.calories ?? 0
       const caloriesAfter = after.nutritional_info?.calories ?? 0
       const caloriesConsumed = Math.max(0, caloriesBefore - caloriesAfter)
+      let geminiBefore: GeminiFoodAnalysis | undefined
+      let geminiAfter: GeminiFoodAnalysis | undefined
+      if (import.meta.env.VITE_GEMINI_API_KEY) {
+        try {
+          ;[geminiBefore, geminiAfter] = await Promise.all([
+            analyzeFoodWithGemini(fileBefore),
+            analyzeFoodWithGemini(fileAfter),
+          ])
+        } catch {
+          // Gemini optional
+        }
+      }
       setResultBeforeAfter({
         before,
         after,
         exp: XP_PER_ANALYSIS * 2,
+        geminiBefore,
+        geminiAfter,
       })
       if (user?.id) {
         try {
+          const foodItems = getFoodItemsFromResponse(before)
           await saveBeforeAfterAnalysis({
             userId: user.id,
             imageFileBefore: fileBefore,
@@ -207,7 +241,12 @@ export function Upload() {
             caloriesAfter,
             caloriesConsumed,
             foodWasteCalories: caloriesAfter,
-            nutritionalData: before.nutritional_info ? { totalNutrients: before.nutritional_info.totalNutrients } : undefined,
+            nutritionalData: before.nutritional_info
+              ? {
+                  totalNutrients: before.nutritional_info.totalNutrients,
+                  detectedItems: foodItems,
+                }
+              : undefined,
             expEarned: XP_PER_ANALYSIS * 2,
           })
         } catch (saveErr) {
@@ -384,6 +423,12 @@ export function Upload() {
                     {Math.round(totalCalories)}
                   </span>
                 </div>
+                {result.gemini?.calories != null && (
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Gemini estimate: {Math.round(result.gemini.calories)} cal
+                    {result.gemini.caption && ` · ${result.gemini.caption}`}
+                  </p>
+                )}
                 <div className="mt-2 flex items-center gap-2 text-emerald-400">
                   <span>+{result.exp} XP</span>
                 </div>
@@ -581,6 +626,31 @@ export function Upload() {
                 <p className="text-2xl font-bold text-red-400">{Math.round(foodWasteCalories)} cal</p>
               </div>
             </div>
+
+            {(resultBeforeAfter.geminiBefore || resultBeforeAfter.geminiAfter) && (
+              <div className="space-y-2">
+                {resultBeforeAfter.geminiBefore && (
+                  <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <p className="text-xs text-zinc-500">Gemini AI (before)</p>
+                    <p className="text-sm text-zinc-300">
+                      {resultBeforeAfter.geminiBefore.caption}
+                      {resultBeforeAfter.geminiBefore.calories != null &&
+                        ` · ${Math.round(resultBeforeAfter.geminiBefore.calories)} cal`}
+                    </p>
+                  </div>
+                )}
+                {resultBeforeAfter.geminiAfter && (
+                  <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <p className="text-xs text-zinc-500">Gemini AI (after / waste)</p>
+                    <p className="text-sm text-zinc-300">
+                      {resultBeforeAfter.geminiAfter.caption}
+                      {resultBeforeAfter.geminiAfter.calories != null &&
+                        ` · ${Math.round(resultBeforeAfter.geminiAfter.calories)} cal`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
               <h3 className="font-medium text-zinc-300 mb-2">Breakdown</h3>

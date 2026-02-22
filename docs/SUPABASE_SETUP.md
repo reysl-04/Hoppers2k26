@@ -10,13 +10,15 @@
 
 Do not paste the file path—only the SQL code.
 
-## 2. Create Storage bucket
+## 2. Create Storage bucket (required for saving images)
 
-1. Go to **Storage** in the Supabase Dashboard
+1. Go to **Supabase Dashboard** → **Storage**
 2. Click **New bucket**
-3. Name: `food-images`
+3. **Name:** `food-images` (must match exactly)
 4. Enable **Public bucket** (so image URLs work for display)
 5. Click **Create bucket**
+
+If you skip this step, you'll get "Bucket not found" when uploading.
 
 ## 3. Storage policies
 
